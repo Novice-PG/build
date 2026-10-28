@@ -1,0 +1,54 @@
+name: ffpack-repack
+
+# Repacks the published FFmpeg v4l2-request pack with corrected build notes and
+# drops the unused noble asset, so the release holds exactly one pack.
+#
+# The binaries and the source tarball are untouched (their hashes are checked
+# against the pack's own SHA256SUMS before repacking); only README-BUILD.md and
+# scripts/install-prebuilt.sh change, because they claimed the binaries need
+# glibc 2.41 while they actually require no symbol newer than GLIBC_2.38.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  repack:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch the published pack
+        run: |
+          curl -fsSL --retry 5 --retry-delay 5 -o pack.tar.gz \
+            "https://github.com/${GITHUB_REPOSITORY}/releases/download/ffmpeg-v4l2-request-v1/ffmpeg-v4l2-request-pack.tar.gz"
+          tar xzf pack.tar.gz
+
+      - name: Correct the glibc floor in the notes
+        run: |
+          set -euo pipefail
+          cd ffmpeg-v4l2-request-pack
+          sed -i 's|二进制：\*\*aarch64 / Debian trixie / glibc 2\.41\*\*，不能在 x86 或 glibc < 2\.41 的系统上跑。|二进制：**aarch64 / 在 Debian trixie 上编译，最高只要求 GLIBC_2.38**，因此 trixie (2.41) 与 noble (2.39) 都能跑，x86 不行。|' \
+            README-BUILD.md
+          sed -i 's|若目标板 glibc 不同，请用 `src/` 源码在板上编译。|若目标板 glibc < 2.38，请用 `src/` 源码在板上编译。|' \
+            README-BUILD.md
+          sed -i 's|(aarch64 / Debian trixie, glibc 2.41)|(aarch64, 需要 GLIBC >= 2.38)|' \
+            scripts/install-prebuilt.sh
+          grep -n 'glibc' README-BUILD.md scripts/install-prebuilt.sh | head -8
+          echo "--- binaries and sources must be byte-identical:"
+          sha256sum -c SHA256SUMS
+          objdump -T bin/ffmpeg | grep -o 'GLIBC_[0-9.]*' | sort -Vu | tail -1
+          cd ..
+          tar czf ffmpeg-v4l2-request-pack.tar.gz ffmpeg-v4l2-request-pack
+          sha256sum ffmpeg-v4l2-request-pack.tar.gz
+
+      - name: Publish and drop the unused noble pack
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release upload ffmpeg-v4l2-request-v1 ffmpeg-v4l2-request-pack.tar.gz \
+            --clobber --repo "${GITHUB_REPOSITORY}"
+          gh release delete-asset ffmpeg-v4l2-request-v1 \
+            ffmpeg-v4l2-request-pack-noble.tar.gz -y --repo "${GITHUB_REPOSITORY}"
+          gh release view ffmpeg-v4l2-request-v1 --repo "${GITHUB_REPOSITORY}" \
+            --json assets --jq '.assets[] | "\(.name) \(.size)"'
