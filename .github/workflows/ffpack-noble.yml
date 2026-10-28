@@ -52,4 +52,22 @@ jobs:
       - name: Publish the asset
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload ffmpeg-v4l2-request-v1 ffmpeg-v4l2-request-pack-noble.tar.gz --clobber
+        run: |
+          set +e
+          {
+            echo "== gh version: $(gh --version | head -1)"
+            echo "== gh auth status:"
+            gh auth status 2>&1
+            echo "== upload:"
+            gh release upload ffmpeg-v4l2-request-v1 ffmpeg-v4l2-request-pack-noble.tar.gz --clobber 2>&1
+            echo "== upload exit: $?"
+          } > "${RUNNER_TEMP}/diag.txt" 2>&1
+          cat "${RUNNER_TEMP}/diag.txt"
+          # Actions logs are not reachable from the build host; keep the diagnostics
+          # on a branch so they can be read through the API.
+          cd "${RUNNER_TEMP}" && mkdir -p diag && cp diag.txt diag/
+          cd diag
+          git init -q -b diag
+          git add diag.txt
+          git -c user.name=ci -c user.email=ci@localhost commit -qm "ci diagnostics" || true
+          git push -q --force "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:refs/heads/ffpack-noble-diag 2>&1 || true
