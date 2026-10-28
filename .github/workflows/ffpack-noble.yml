@@ -10,6 +10,9 @@ name: ffpack-noble
 # cross compiler is involved.
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - ffpack-noble-run
 
 permissions:
   contents: write
