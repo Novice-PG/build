@@ -37,7 +37,7 @@ jobs:
           cd ffmpeg-v4l2-request-pack
           install -m 755 /opt/ffmpeg-v4l2/bin/ffmpeg bin/ffmpeg
           install -m 755 /opt/ffmpeg-v4l2/bin/ffprobe bin/ffprobe
-          sed -i 's/glibc 2\.41/glibc 2.39/g; s/Debian trixie/Ubuntu noble/g' \
+          sed -i 's/glibc 2\.41/glibc 2.39/g; s/glibc < 2\.41/glibc < 2.38/g; s/Debian trixie/Ubuntu noble/g' \
             README-BUILD.md scripts/install-prebuilt.sh
           sha256sum src/kwiboo-ffmpeg-v4l2-request-n8.1.tgz bin/ffmpeg bin/ffprobe > SHA256SUMS
           cd ..
